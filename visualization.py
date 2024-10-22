@@ -55,7 +55,7 @@ def visualize_clusters(points, clusters, title, centroids=None, medoids=None):
 
         for cluster_id, centroid in centroids.items():
             color_idx = cluster_to_color_index[cluster_id]
-            print(f"Centroid {cluster_id}")
+            print(f"Centroid {cluster_id}, Coordinates ({centroid[0]}, {centroid[1]})")
             plt.scatter(centroid[0], centroid[1], s=20, color=colors(color_idx), edgecolor='black')
 
         print("Done")
@@ -66,7 +66,7 @@ def visualize_clusters(points, clusters, title, centroids=None, medoids=None):
 
         for cluster_id, medoid in medoids.items():
             color_idx = cluster_to_color_index[cluster_id]
-            print(f"Medoid {cluster_id}")
+            print(f"Medoid {cluster_id}, Coordinates({medoid[0]}, {medoid[1]})")
             plt.scatter(medoid[0], medoid[1], s=20, color=colors(color_idx), edgecolor='black')
 
         print("Done")

@@ -28,3 +28,13 @@ if __name__ == "__main__":
 
         clusters, medoids = agglomerative_medoid_clustering(all_points)
         visualize_clusters(all_points, clusters, 'Medoids', medoids=medoids)
+
+    elif clusterization_method == "unify_clustering":
+        all_points = generate_additional_points(initial_points, additional_points_num)
+        visualize_initial(all_points)
+
+        clusters, centroids = agglomerative_centroid_clustering(all_points)
+        visualize_clusters(all_points, clusters, 'Centroids', centroids=centroids)
+
+        clusters, medoids = agglomerative_medoid_clustering(all_points)
+        visualize_clusters(all_points, clusters, 'Medoids', medoids=medoids)
