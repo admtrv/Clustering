@@ -1,7 +1,6 @@
 # visualization.py
 
 import os
-import numpy as np
 from matplotlib import pyplot as plt
 
 # Path params
@@ -17,7 +16,7 @@ def visualize_initial(points):
 
     plt.figure(figsize=(10, 10))
 
-    # Отображение точек
+    # Cluster points
     plt.scatter(points[:, 0], points[:, 1], s=20, color='lightblue')
 
     plt.title(title)
@@ -39,7 +38,7 @@ def visualize_clusters(points, clusters, title, centroids=None, medoids=None):
 
     print(f"Visualizing {num_clusters} clusters...")
 
-    # Отображение точек кластеров
+    # Cluster points
     for cluster_id in cluster_ids:
         point_indices = clusters[cluster_id]
         cluster_points = points[point_indices]
@@ -49,7 +48,7 @@ def visualize_clusters(points, clusters, title, centroids=None, medoids=None):
 
     print("Done")
 
-    # Отображение центроидов
+    # Centroids
     if centroids is not None:
         print("Drawing centroids...")
 
@@ -60,7 +59,7 @@ def visualize_clusters(points, clusters, title, centroids=None, medoids=None):
 
         print("Done")
 
-    # Отображение медоидов
+    # Medoids
     if medoids is not None:
         print("Drawing medoids...")
 

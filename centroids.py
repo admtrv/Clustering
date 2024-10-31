@@ -2,84 +2,81 @@
 
 import numpy as np
 import time
-
+from sklearn.neighbors import KDTree
 import config
-max_average_distance = config.max_average_distance
+
+# Config data
+max_distance = config.max_distance
 
 def agglomerative_centroid_clustering(points):
     num_points = len(points)
-    clusters = {i: [i] for i in range(num_points)}                          # Cловарь индекс - отдельный кластер
-    centroids = {i: points[i].astype(float) for i in range(num_points)}     # Cловарь индекс - координаты соответствующего центроида
+    clusters = {i: [i] for i in range(num_points)}  # Index to list of point indices in the cluster,        f.e. clusters = {2: [2], 5: [5], 7: [7]}
+    centroids = {i: points[i].astype(float) for i in range(num_points)}  # Index to centroid coordinates,   f.e. centroids = {2: [1.0, 2.0], 5: [3.0, 4.0], 7: [5.0, 6.0]}
+    active_clusters = list(clusters.keys())  # List of active cluster indices,                              f.e. active_clusters = [2, 5, 7]
 
-    print("Destination matrix initialization...")
-    distance_matrix = np.full((num_points, num_points), np.inf)      # Матрица расстояний между парами точек
-    start_time = time.time()
-    for i in range(num_points):
-
-        if i % 1000 == 0 or i == num_points - 1:
-            elapsed_time = time.time() - start_time
-            print(f"Processed {i + 1}/{num_points} points, Time {elapsed_time:.2f} s")
-
-        for j in range(i + 1, num_points):
-            dist = np.linalg.norm(points[i] - points[j])
-            distance_matrix[i, j] = dist
-            distance_matrix[j, i] = dist
-    print("Done")
-
-    active_clusters = set(range(num_points))    # Множество всех активных кластеров
+    print("Сentroid сlusterization...")
 
     iteration = 0
     total_start_time = time.time()
 
-    print("Cycle of clusterization...")
-    while len(active_clusters) > 1:             # Активный кластер — кластер, который ещё участвует в процессе
+    while len(active_clusters) > 1:
         iteration += 1
+
+        # Getting centroid coordinates of current clusters
+        centroid_coords = np.array([centroids[i] for i in active_clusters])                                 # f.e. centroid_coords = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+        index_to_id = {idx: cluster_id for idx, cluster_id in enumerate(active_clusters)}                   # f.e. index_to_id = {0: 2, 1: 5, 2: 7 }
+
+        # Build k-d tree on centroids
+        tree = KDTree(centroid_coords)
+
+        # Set k greater than 2 to have a buffer of neighbors in case of ties                                # f.e. if k = 2,
+        k = min(10, len(active_clusters))                                                                   # f.e. distances = [[0.0, 2.83], [0.0, 2.83], [0.0, 2.83]]
+        distances, indices = tree.query(centroid_coords, k=k)                                               # f.e. indices = [[0, 1],[1, 0],[2, 1]]
 
         min_distance = np.inf
         min_pair = None
 
-        for i in active_clusters:                                   # Поиск ближайшей пары кластеров
-            distances = distance_matrix[i, list(active_clusters)]
-            min_idx = np.argmin(distances)
-            j = list(active_clusters)[min_idx]
-            if i != j and distance_matrix[i, j] < min_distance:
-                min_distance = distance_matrix[i, j]                # Пара кластеров для объединения
+        for idx, (dist_list, ind_list) in enumerate(zip(distances, indices)):
+            i = index_to_id[idx]
+            # Find the nearest cluster that is not itself
+            for dist, neighbor_idx in zip(dist_list[1:], ind_list[1:]):  # Start from [1:] to skip itself
+                if neighbor_idx != idx:
+                    j = index_to_id[neighbor_idx]
+                    break
+            else:
+                # If none found, skip this cluster
+                continue
+
+            # Check if the current pair has the minimum distance
+            if dist < min_distance:
+                min_distance = dist
                 min_pair = (i, j)
 
-
         if min_pair is None:
-            print(f"Iteration {iteration}, cant find pair to unite")
+            print(f"\rIteration {iteration}, No valid pairs found", end="")
+            break
+
+        if min_distance > max_distance:
+            print(f"\rIteration {iteration}, Min Distance ({min_distance:.2f}) > Max Distance ({max_distance})", end="")
             break
 
         i, j = min_pair
 
-        if min_distance > max_average_distance:
-            print(f"Iteration {iteration}, stopping as min_distance ({min_distance:.2f}) > max_average_distance ({max_average_distance})")
-            break
+        iteration_time = time.time() - total_start_time
+        print(f"\rIteration {iteration}, Unified clusters {i} and {j}, Distance {min_distance:.2f}, Time: {iteration_time:.2f}s",end="")
 
-        print(f"Iteration {iteration}, Uniting clusters {i} {j}, Distance {min_distance:.2f}")
-
-        # Объединяем кластеры i и j
-        clusters[i].extend(clusters[j])     # Добавляем точки из j в i
-        del clusters[j]                     # Удаляем j из словаря и активного множества
+        # Merge clusters i and j
+        clusters[i].extend(clusters[j])
         active_clusters.remove(j)
+        del clusters[j]
         del centroids[j]
 
-        # Обновляем центроид кластера i
-        centroids[i] = np.mean(points[clusters[i]], axis=0)         # Среднее арифметическое координат всех точек
+        # Update centroid of the merged cluster
+        centroids[i] = np.mean(points[clusters[i]], axis=0)
 
-        # Обновляем матрицу расстояний для кластера i
-        for k in active_clusters:
-            if k != i:
-                dist = np.linalg.norm(centroids[i] - centroids[k])      # Расстояние от нового кластера до остальных активных кластеров
-                distance_matrix[i, k] = dist
-                distance_matrix[k, i] = dist
-
-    print("Done")
+    print("\nDone")
 
     total_time = time.time() - total_start_time
-    print(f"Total time {total_time:.2f} s, Iterations {iteration}")
-
-    final_centroids = {cluster_id: centroids[cluster_id] for cluster_id in clusters.keys()}
+    print(f"Total time {total_time:.2f}s, Iterations {iteration}")
 
     return clusters, centroids

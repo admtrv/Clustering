@@ -2,89 +2,79 @@
 
 import numpy as np
 import time
-
+from sklearn.neighbors import KDTree
 import config
-max_average_distance = config.max_average_distance
+
+# Config data
+max_distance = config.max_distance
 
 def agglomerative_medoid_clustering(points):
     num_points = len(points)
-    clusters = {i: [i] for i in range(num_points)}  # Словарь, где индекс - это кластер
-    medoids = {i: points[i].astype(float) for i in range(num_points)}  # Словарь, где индекс - это координаты медоида
+    clusters = {i: [i] for i in range(num_points)}
+    medoids = {i: points[i].astype(float) for i in range(num_points)}
+    active_clusters = list(clusters.keys())
 
-    print("Destination matrix initialization...")
-    distance_matrix = np.full((num_points, num_points), np.inf)  # Матрица расстояний между парами точек
-    start_time = time.time()
-    for i in range(num_points):
-        if i % 1000 == 0 or i == num_points - 1:
-            elapsed_time = time.time() - start_time
-            print(f"Processed {i + 1}/{num_points} points, Time {elapsed_time:.2f} s")
-
-        for j in range(i + 1, num_points):
-            dist = np.linalg.norm(points[i] - points[j])
-            distance_matrix[i, j] = dist
-            distance_matrix[j, i] = dist
-    print("Done")
-
-    active_clusters = set(range(num_points))  # Множество всех активных кластеров
+    print("Medoid clusterization...")
 
     iteration = 0
     total_start_time = time.time()
 
-    print("Cycle of clusterization...")
-    while len(active_clusters) > 1:  # Активный кластер — это кластер, который ещё участвует в процессе
+    while len(active_clusters) > 1:
         iteration += 1
+
+        medoid_coords = np.array([medoids[i] for i in active_clusters])
+        index_to_id = {idx: cluster_id for idx, cluster_id in enumerate(active_clusters)}
+
+        tree = KDTree(medoid_coords)
+
+        k = min(10, len(active_clusters))
+        distances, indices = tree.query(medoid_coords, k=k)
 
         min_distance = np.inf
         min_pair = None
 
-        for i in active_clusters:  # Поиск ближайшей пары кластеров
-            distances = distance_matrix[i, list(active_clusters)]
-            min_idx = np.argmin(distances)
-            j = list(active_clusters)[min_idx]
-            if i != j and distance_matrix[i, j] < min_distance:
-                min_distance = distance_matrix[i, j]  # Пара кластеров для объединения
+        for idx, (dist_list, ind_list) in enumerate(zip(distances, indices)):
+            i = index_to_id[idx]
+            for dist, neighbor_idx in zip(dist_list[1:], ind_list[1:]):
+                if neighbor_idx != idx:
+                    j = index_to_id[neighbor_idx]
+                    break
+            else:
+                continue
+
+            if dist < min_distance:
+                min_distance = dist
                 min_pair = (i, j)
 
         if min_pair is None:
-            print(f"Iteration {iteration}, can't find pair to unite")
+            print(f"\rIteration {iteration}, No valid pairs", end="")
+            break
+
+        if min_distance > max_distance:
+            print(f"\rIteration {iteration}, Min Distance ({min_distance:.2f}) > Max Distance ({max_distance})", end="")
             break
 
         i, j = min_pair
 
-        if min_distance > max_average_distance:
-            print(f"Iteration {iteration}, stopping as min_distance ({min_distance:.2f}) > max_average_distance ({max_average_distance})")
-            break
+        iteration_time = time.time() - total_start_time
+        print(f"\rIteration {iteration}, Unified clusters {i} and {j}, Distance {min_distance:.2f}, Time: {iteration_time:.2f}s", end="")
 
-        print(f"Iteration {iteration}, Uniting clusters {i} {j}, Distance {min_distance:.2f}")
-
-        # Объединяем кластеры i и j
-        clusters[i].extend(clusters[j])  # Добавляем точки из j в i
-        del clusters[j]  # Удаляем j из словаря и множества активных кластеров
+        clusters[i].extend(clusters[j])
         active_clusters.remove(j)
+        del clusters[j]
         del medoids[j]
 
-        # Обновляем медоид кластера i
-        # Медоид — точка внутри кластера, которая минимизирует сумму расстояний до всех остальных точек кластера
-        cluster_points = [points[idx] for idx in clusters[i]]
-        min_sum_distance = np.inf
-        new_medoid = medoids[i]
-        for point in cluster_points:
-            sum_distance = np.sum([np.linalg.norm(point - other_point) for other_point in cluster_points])
-            if sum_distance < min_sum_distance:
-                min_sum_distance = sum_distance
-                new_medoid = point
-        medoids[i] = new_medoid
+        cluster_point_indices = clusters[i]
+        cluster_points = points[cluster_point_indices]
 
-        # Обновляем матрицу расстояний для кластера i
-        for k in active_clusters:
-            if k != i:
-                dist = np.linalg.norm(medoids[i] - medoids[k])  # Расстояние от нового медоида до остальных активных кластеров
-                distance_matrix[i, k] = dist
-                distance_matrix[k, i] = dist
+        distances_matrix = np.linalg.norm(cluster_points[:, np.newaxis] - cluster_points[np.newaxis, :], axis=2)
+        sum_distances = np.sum(distances_matrix, axis=1)
+        min_index = np.argmin(sum_distances)
+        medoids[i] = cluster_points[min_index]
 
-    print("Done")
+    print("\nDone")
 
     total_time = time.time() - total_start_time
-    print(f"Total time {total_time:.2f} s, Iterations {iteration}")
+    print(f"Total time {total_time:.2f}s, Iterations {iteration}")
 
     return clusters, medoids
