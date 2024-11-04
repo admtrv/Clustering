@@ -49,7 +49,7 @@ To optimize performance with large datasets, a K-D Tree is used for efficient ne
 1. **Clone the Repository:**
 
 ```bash
-git clone https://github.com/yourusername/AgglomerativeClustering.git
+git clone https://github.com/admtrv/Clustering.git
 ```
 2. **Run the Main Script:**
 
